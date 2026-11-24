@@ -10,6 +10,14 @@ The dashboard also displays current weather for Sundernagar, Mandi, and includes
 
 > **Important:** This is an educational prototype, not a certified fire-detection or emergency-warning system. Risk thresholds are provisional and must be calibrated and validated before any real-world use. The weather-based model estimates relative satellite-hotspot candidate likelihood; it does not confirm fires.
 
+## Dashboard report
+
+A PDF report containing dashboard pages, live sensor readings, station status, fire-risk assessment, reading-history charts, local weather and the experimental hotspot-prediction panel is available here:
+
+[View the Forest Fire Monitoring dashboard report](reports/Forest-Fire-Monitoring.pdf)
+
+**Note:** The hotspot model score shown in the report is experimental and should not be interpreted as a verified probability of an active fire.
+
 ## Hardware
 
 - **Transmitter:** ESP32 Dev Module
@@ -139,6 +147,8 @@ Do not commit private credentials, local databases, virtual environments, or gen
 ├── README.md
 ├── .env.example
 ├── .gitignore
+├── reports/
+│   └── Forest-Fire-Monitoring.pdf
 └── firmware/
     ├── TX_ESP32/
     │   └── TX_ESP32.ino
