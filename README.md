@@ -8,6 +8,34 @@ The project combines a live sensor station with a Streamlit dashboard. An ESP32 
 
 The dashboard also displays current weather for Sundernagar, Mandi, and includes an experimental regional next-day hotspot-candidate estimate when a compatible model file is available.
 
+## System architecture
+
+The following diagram shows how sensor readings travel from the field station to the dashboard and notification services.
+
+```mermaid
+flowchart TD
+    subgraph Station[Forest monitoring station]
+        S1[DHT22<br/>Temperature and humidity]
+        S2[Soil moisture sensor]
+        S3[MQ-2<br/>Smoke / gas sensor]
+        TX[ESP32 transmitter<br/>Reads sensors and hosts Wi-Fi]
+        S1 --> TX
+        S2 --> TX
+        S3 --> TX
+    end
+
+    TX -- Wi-Fi access point + HTTP JSON --> RX[ESP8266 NodeMCU receiver]
+    RX -- USB serial<br/>115200 baud --> PC[Computer running Streamlit]
+    PC --> DB[(SQLite reading history)]
+    PC --> DASH[Live dashboard<br/>Sensor values and station risk]
+    PC --> TG[Telegram notifications<br/>MODERATE / HIGH risk changes]
+    PC --> WX[Open-Meteo weather data]
+    PC --> ML[Experimental regional<br/>hotspot estimate]
+
+    style Station fill:#eef6ff,stroke:#4776a8
+```
+
+
 > **Important:** This is an educational prototype, not a certified fire-detection or emergency-warning system. Risk thresholds are provisional and must be calibrated and validated before any real-world use. The weather-based model estimates relative satellite-hotspot candidate likelihood; it does not confirm fires.
 
 ## Dashboard report
