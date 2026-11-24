@@ -1,32 +1,66 @@
 # Himachal Forest Fire Monitoring
 
-IoT- and ML-based forest-fire monitoring and early-warning prototype for Himachal Pradesh.
+An IoT- and ML-based forest-fire monitoring and early-warning prototype for Himachal Pradesh.
 
 ## Project overview
 
-The project combines a live sensor station with a Streamlit dashboard. The dashboard reads JSON sensor data from an RX NodeMCU over USB serial, estimates a station-level risk band, stores readings in SQLite, and can send Telegram alerts when the risk band changes. It also displays current weather for Sundernagar, Mandi, and includes an experimental regional next-day hotspot-candidate estimate when a compatible model file is available.
+The project combines a live sensor station with a Streamlit dashboard. An ESP32 transmitter reads temperature, humidity, soil-moisture and smoke-sensor values. It creates a Wi-Fi hotspot and serves the latest readings over HTTP. An ESP8266 NodeMCU receiver connects to that hotspot, fetches the JSON data and forwards it to the computer over USB serial. The Streamlit dashboard reads the serial data, estimates a station-level risk band, stores readings in SQLite and can send Telegram alerts when the risk band changes.
+
+The dashboard also displays current weather for Sundernagar, Mandi, and includes an experimental regional next-day hotspot-candidate estimate when a compatible model file is available.
 
 > **Important:** This is an educational prototype, not a certified fire-detection or emergency-warning system. Risk thresholds are provisional and must be calibrated and validated before any real-world use. The weather-based model estimates relative satellite-hotspot candidate likelihood; it does not confirm fires.
 
-## Hardware used
+## Hardware
 
-- TX NodeMCU sensor station
-- RX NodeMCU connected to the computer by USB
-- DHT22 temperature/humidity sensor
-- Soil-moisture sensor
-- MQ-2 gas/smoke sensor
-- LoRa modules used for station-to-receiver communication in the hardware setup
+- **Transmitter:** ESP32 Dev Module
+- **Receiver:** ESP8266 NodeMCU connected to the computer by USB
+- **Temperature and humidity:** DHT22
+- **Soil moisture:** analog soil-moisture sensor
+- **Smoke/gas:** MQ-2 analog output
+- **Communication:** ESP32 Wi-Fi Access Point + HTTP; no LoRa or external router is required
 
-The RX NodeMCU should output one JSON object per serial line, for example:
+### Current ESP32 pin configuration
+
+| Sensor signal | ESP32 GPIO |
+| --- | --- |
+| DHT22 DATA | GPIO 4 |
+| Soil-moisture AO | GPIO 34 |
+| MQ-2 AO | GPIO 35 |
+
+Ensure every analog signal connected to the ESP32 is within its allowed input-voltage range (maximum 3.3 V). If the MQ-2 module is powered from 5 V, use an appropriate voltage divider/level-conditioning circuit on AO before connecting it to the ESP32.
+
+### Wi-Fi and data format
+
+The ESP32 creates this hotspot:
+
+- SSID: `ForestFire_Network`
+- Password: `ForestFire123`
+- ESP32 address: `192.168.4.1`
+- HTTP endpoint: `http://192.168.4.1/data`
+
+The RX NodeMCU connects to the hotspot and prints one JSON object per serial line, for example:
 
 ```json
 {"station":"Station_1","temperature":15.1,"humidity":60.8,"soil_moisture_raw":69,"smoke_raw":2559}
 ```
 
+The receiver serial baud rate is **115200**. The dashboard's default serial port is **COM15** and may need changing in `app.py` on another computer.
+
+## Firmware
+
+- Transmitter: [`firmware/TX_ESP32/TX_ESP32.ino`](firmware/TX_ESP32/TX_ESP32.ino)
+- Receiver: [`firmware/RX_NodeMCU/RX_NodeMCU.ino`](firmware/RX_NodeMCU/RX_NodeMCU.ino)
+
+Open each sketch in Arduino IDE and select the matching board:
+- TX: **ESP32 Dev Module**
+- RX: **NodeMCU 1.0 (ESP-12E Module)**
+
+The TX sketch requires the **DHT sensor library by Adafruit** and **Adafruit Unified Sensor** library.
+
 ## Software requirements
 
 - Python 3.10 or later recommended
-- Arduino IDE and the appropriate NodeMCU board support for firmware
+- Arduino IDE with ESP32 and ESP8266 board support
 - A Telegram bot and chat ID (optional, for notifications)
 
 ## Setup
@@ -56,9 +90,11 @@ The RX NodeMCU should output one JSON object per serial line, for example:
 
    Keep `.env` private. It is excluded from Git by `.gitignore`. Never commit bot tokens or other secrets.
 
-6. Connect the RX NodeMCU by USB. Close Arduino IDE Serial Monitor so the dashboard can access the serial port.
-7. If your receiver uses a port other than `COM15`, edit `SERIAL_PORT` near the top of `app.py`. The configured baud rate is `115200`.
-8. Start the dashboard:
+6. Upload the TX firmware to the ESP32 and the RX firmware to the NodeMCU.
+7. Power the ESP32 transmitter. Confirm that its hotspot is available, then power/connect the RX NodeMCU.
+8. Connect the RX NodeMCU to the computer by USB. Close Arduino IDE Serial Monitor so the dashboard can access the serial port.
+9. If the receiver uses a port other than `COM15`, edit `SERIAL_PORT` near the top of `app.py`. The configured baud rate is `115200`.
+10. Start the dashboard:
 
    ```powershell
    streamlit run app.py
@@ -72,7 +108,7 @@ The current demonstration scoring rules use temperature, relative humidity, soil
 - **MODERATE:** score 2–3
 - **HIGH:** score 4 or more
 
-For this soil sensor, a lower raw reading indicates drier soil. The MQ-2 threshold is provisional. Both soil and MQ-2 values are raw readings, not calibrated moisture percentages or smoke concentrations.
+For this soil sensor, a lower raw reading indicates drier soil. The MQ-2 threshold is provisional. Soil and MQ-2 values are raw readings, not calibrated moisture percentages or smoke concentrations.
 
 Telegram notifications are sent when the station enters MODERATE or HIGH and when it changes between those bands. Returning to LOW resets the alert state for the next risk episode.
 
@@ -88,11 +124,11 @@ Do not commit private credentials, local databases, virtual environments, or gen
 ## Current limitations
 
 - Only Station 1 is configured in the current dashboard.
-- Serial port is configured as `COM15` by default and may need changing on another computer.
+- The serial port defaults to `COM15` and may need changing on another computer.
 - Sensor thresholds require calibration against actual sensor measurements and local conditions.
-- MQ-2 readings are affected by warm-up, environment, and sensor characteristics.
+- MQ-2 readings are affected by warm-up, environment and sensor characteristics.
 - The regional hotspot estimate depends on an externally supplied compatible model and live weather forecast data.
-- This prototype should not replace official forest department alerts, satellite monitoring, or emergency services.
+- This prototype should not replace official forest department alerts, satellite monitoring or emergency services.
 
 ## Repository structure
 
@@ -102,7 +138,10 @@ Do not commit private credentials, local databases, virtual environments, or gen
 ├── requirements.txt
 ├── README.md
 ├── .env.example
-└── .gitignore
+├── .gitignore
+└── firmware/
+    ├── TX_ESP32/
+    │   └── TX_ESP32.ino
+    └── RX_NodeMCU/
+        └── RX_NodeMCU.ino
 ```
-
-Firmware source and the trained model artifact should be added in their own folders when ready. Do not upload secrets or private data.
